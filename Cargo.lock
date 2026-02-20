@@ -3,5 +3,5 @@
 version = 4
 
 [[package]]
-name = "prog_black_2_pub"
+name = "rust_games"
 version = "0.1.0"
