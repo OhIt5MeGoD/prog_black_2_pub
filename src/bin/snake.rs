@@ -3,15 +3,18 @@ use std::collections::VecDeque;
 use std::io::{stdout, Write};
 use std::ops::Add;
 use std::thread;
-use std::time;
+use std::time::{self, Duration};
+use crossterm::event::KeyCode;
 use crossterm::{ExecutableCommand, execute,
     cursor::{RestorePosition, SavePosition, Hide, Show, MoveTo}, 
-    terminal::{enable_raw_mode, disable_raw_mode, Clear, ClearType::All}};
+    terminal::{enable_raw_mode, disable_raw_mode, Clear, ClearType::All},
+    event::{poll, read, Event}};
 
+const BOARD_SIZE: (usize, usize) = (12, 12);
 #[derive(Clone, Debug, Copy)]
 struct Coord {  
-    x: i8,
-    y: i8
+    x: i16,
+    y: i16
 }
 
 impl Coord {
@@ -21,7 +24,7 @@ impl Coord {
     pub const LEFT: Coord = Coord {x:-1,y:0};
 
     fn index(self) -> usize{
-        (self.x + self.y * 12) as usize
+        (self.x + self.y * (BOARD_SIZE.1) as i16) as usize
     }
 }
 
@@ -68,20 +71,21 @@ impl Snake {
     }
 }
 
-fn print_board(board: &[char], w: usize, h: usize){
+fn print_board(board: &[char]){
     stdout().execute(SavePosition).unwrap();
-    for row in 0..board.len()/h{
-        for col in 0..board.len()/12{
-            write!(stdout(), "{}  ",board[row*w+col]).unwrap();
+    for col in 0..board.len()/BOARD_SIZE.0{
+        for row in 0..board.len()/BOARD_SIZE.1{
+            write!(stdout(), "{}  ",board[col*BOARD_SIZE.1+row]).unwrap();
         }
         write!(stdout(), "\r\n").unwrap();
     }
     stdout().execute(RestorePosition).unwrap();
 }
-fn main (){
-    enable_raw_mode().unwrap();
-    execute!(stdout(), Hide, Clear(All), MoveTo(0,0)).unwrap();
-    let board: [char;144] =     ['#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#',
+fn main () -> std::io::Result<()>{
+    enable_raw_mode()?;
+    execute!(stdout(), Hide, Clear(All), MoveTo(0,0))?;
+    let board: [char;BOARD_SIZE.0 * BOARD_SIZE.1] = 
+                                ['#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#',
                                  '#', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '#',
                                  '#', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '#',
                                  '#', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '#',
@@ -98,7 +102,7 @@ fn main (){
     body.push_back(Coord { x: 1, y: 1 });
     body.push_back(Coord { x: 2, y: 1 });
     let mut snake: Snake = Snake::new(body, Coord::RIGHT, board);
-    for _ in 0..10 {
+    loop {
         thread::sleep(time::Duration::from_millis(300));
         match snake_loop(&mut snake) {
             Ok(_) => continue,
@@ -107,18 +111,41 @@ fn main (){
             }
         }
     }
-    disable_raw_mode().unwrap();
-    stdout().execute(Show).unwrap();
+    disable_raw_mode()?;
+    stdout().execute(Show)?;
+    Ok(())
 }
 
 fn snake_loop(snake: &mut Snake) -> Result<(), &str>{
+    change_dir(snake).unwrap();
     match snake.travel() {
-        Ok(_) => print_board(&snake.board, 12, 12),
+        Ok(_) => print_board(&snake.board),
         _ => {
             stdout().execute(Clear(All)).unwrap();
             println!("Game over!");
             return Err("Game over");
         }
+    }
+    Ok(())
+}
+
+fn change_dir(snake: &mut Snake)-> std::io::Result<()> {
+    let mut event: Option<Event> = None;
+    while poll(Duration::from_secs(0))? == true {
+        event = Some(read()?);
+    }
+
+    match event {
+        Some(Event::Key(key)) => {
+            match key.code {
+                KeyCode::Up => snake.dir = Coord::UP,
+                KeyCode::Down => snake.dir = Coord::DOWN,
+                KeyCode::Left => snake.dir = Coord::LEFT,
+                KeyCode::Right => snake.dir = Coord::RIGHT,
+                _ => ()
+            }
+        }
+        _ => ()
     }
     Ok(())
 }
