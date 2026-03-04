@@ -1,13 +1,15 @@
 // snake game in rust
 use std::collections::VecDeque;
-use std::io::{self, stdout, Write};
+use std::io::{stdout, Write};
 use std::ops::Add;
 use std::thread;
 use std::time;
-use crossterm::{ExecutableCommand, cursor::{RestorePosition, SavePosition, Hide, MoveTo}, execute, QueueableCommand};
-use crossterm::terminal::{enable_raw_mode, disable_raw_mode, Clear, ClearType::All};
+use crossterm::{ExecutableCommand, execute,
+    cursor::{RestorePosition, SavePosition, Hide, Show, MoveTo}, 
+    terminal::{enable_raw_mode, disable_raw_mode, Clear, ClearType::All}};
+
 #[derive(Clone, Debug, Copy)]
-struct Coord {
+struct Coord {  
     x: i8,
     y: i8
 }
@@ -66,22 +68,19 @@ impl Snake {
     }
 }
 
-fn print_board(board: &[char], w: usize, h: usize) -> io::Result<()>{
-    stdout().queue(Clear(All))?;
-    stdout().queue(SavePosition)?;
-    stdout().flush()?;
+fn print_board(board: &[char], w: usize, h: usize){
+    stdout().execute(SavePosition).unwrap();
     for row in 0..board.len()/h{
         for col in 0..board.len()/12{
-            write!(stdout(), "{}  ",board[row*w+col])?;
+            write!(stdout(), "{}  ",board[row*w+col]).unwrap();
         }
-        write!(stdout(), "\r\n")?;
+        write!(stdout(), "\r\n").unwrap();
     }
-    stdout().execute(RestorePosition)?;
-    Ok(())
+    stdout().execute(RestorePosition).unwrap();
 }
-fn main () -> io::Result<()>{
-    enable_raw_mode()?;
-    execute!(stdout(), Hide, Clear(All), MoveTo(0,0))?;
+fn main (){
+    enable_raw_mode().unwrap();
+    execute!(stdout(), Hide, Clear(All), MoveTo(0,0)).unwrap();
     let board: [char;144] =     ['#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#',
                                  '#', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '#',
                                  '#', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '#',
@@ -99,20 +98,27 @@ fn main () -> io::Result<()>{
     body.push_back(Coord { x: 1, y: 1 });
     body.push_back(Coord { x: 2, y: 1 });
     let mut snake: Snake = Snake::new(body, Coord::RIGHT, board);
-    for i in 0..10 {
+    for _ in 0..10 {
         thread::sleep(time::Duration::from_millis(300));
-        game(&mut snake)?;
+        match snake_loop(&mut snake) {
+            Ok(_) => continue,
+            Err(_) => {
+                break;
+            }
+        }
     }
-    disable_raw_mode()?;
-    Ok(())
+    disable_raw_mode().unwrap();
+    stdout().execute(Show).unwrap();
 }
 
-fn game(snake: &mut Snake) -> io::Result<()>{
-    //TODO: Propagate collision error 
-    let res = snake.travel();
-    match res {
-        Ok(()) => print_board(&snake.board, 12, 12)?,
-        Err(e) => println!("Collision")
+fn snake_loop(snake: &mut Snake) -> Result<(), &str>{
+    match snake.travel() {
+        Ok(_) => print_board(&snake.board, 12, 12),
+        _ => {
+            stdout().execute(Clear(All)).unwrap();
+            println!("Game over!");
+            return Err("Game over");
+        }
     }
     Ok(())
 }
