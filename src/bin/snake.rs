@@ -2,20 +2,23 @@
 use std::collections::VecDeque;
 use std::io::{stdout, Write};
 use std::ops::Add;
-use std::cmp::Eq;
 use std::thread;
-use std::time::{self, Duration};
-use crossterm::{ExecutableCommand, execute,
-                cursor::{RestorePosition, SavePosition, Hide, Show, MoveTo}, 
-                terminal::{enable_raw_mode, disable_raw_mode, Clear, ClearType::All},
-                event::{poll, read, Event, KeyCode}};
+use std::time::Duration;
+use crossterm::cursor;
+use crossterm::terminal::{self, ClearType};
+use crossterm::event::{poll, read, Event, KeyCode};
+use crossterm::execute;
 use rand::RngExt;
 
-const BOARD_SIZE: (usize, usize) = (12, 12);
+const BOARD_SIZE: (i32, i32) = (12, 12);
+const WIDTH_SCALE: i32 = 3;
+const BOARD_WIDTH: usize = (BOARD_SIZE.0 * WIDTH_SCALE) as usize;
+const BOARD_LEN: usize= (BOARD_SIZE.0 * BOARD_SIZE.1 * WIDTH_SCALE) as usize;
+
 #[derive(Clone, Debug, Copy)]
 struct Coord {  
-    x: i16,
-    y: i16
+    x: i32,
+    y: i32
 }
 
 impl Coord {
@@ -26,7 +29,7 @@ impl Coord {
     pub const ZERO: Coord = Coord {x:0, y:0};
 
     fn index(self) -> usize{
-        (self.x + self.y * (BOARD_SIZE.1) as i16) as usize
+        ((self.x + self.y * BOARD_SIZE.0) * WIDTH_SCALE) as usize
     }
 }
 
@@ -39,115 +42,51 @@ impl Add for Coord {
 }
 
 impl PartialEq for Coord {
-    fn eq(&self, other: &Self) -> bool {
-        self.x == other.x && self.y == other.y
+    fn eq(&self, rhs: &Self) -> bool {
+        self.x == rhs.x && self.y == rhs.y
     }
 }
-
-impl Eq for Coord {}
 
 struct Snake {
     body: VecDeque<Coord>,
     dir: Coord,
-    board: [char;144]
 }
 
 impl Snake {
 
-    fn new(body:VecDeque<Coord>, dir: Coord, mut board: [char;144]) -> Self {
-        let head = body.back().expect("no body");
-        board[head.index()] = '@';
-        for section in body.iter().rev().skip(1){
-            board[section.index()] = '#';
-        }
-        Self {body, dir, board}
+    fn new(pos: Coord, dir: Coord) -> Self {
+        let mut body = VecDeque::new();
+        body.push_back(pos);
+        Self {body, dir}
     }
 
-    fn travel(&mut self) -> Result<(),&str> {
+    fn travel(&mut self, board: &mut [char]) -> Result<(),()> {
         let head: &Coord = self.body.back().expect("no body");
-        self.board[head.index()] = '#';
+        board[head.index()] = '#';
 
         let new_head = head.clone()+self.dir;
         self.body.push_back(new_head);
-        if self.board[new_head.index()] == '#' {
-            return Err("Collision")
-        }
-        else if self.board[new_head.index()] == 'X' {
-            self.board[new_head.index()] = '@';
-            spawn_fruit(self);
-            return Ok(())
-        }
-        self.board[new_head.index()] = '@';
 
-        let tail = self.body.front().expect("no body");
-        self.board[tail.index()] = ' ';
-        self.body.pop_front();
+        if matches!(board[new_head.index()], '#' | '─' | '│' | '┌' | '┐' | '└' | '┘' ) {
+            return Err(());
+        }
+        else if board[new_head.index()] == 'X' {
+            spawn_fruit(self, board);
+        }
+        else {
+            let tail = self.body.front().expect("no body");
+            board[tail.index()] = ' ';
+            self.body.pop_front();
+        }
+        board[new_head.index()] = '@';
         Ok(())
     }
 }
 
-fn print_board(board: &[char]){
-    stdout().execute(SavePosition).unwrap();
-    for col in 0..board.len()/BOARD_SIZE.0{
-        for row in 0..board.len()/BOARD_SIZE.1{
-            write!(stdout(), "{}  ",board[col*BOARD_SIZE.1+row]).unwrap();
-        }
-        write!(stdout(), "\r\n").unwrap();
-    }
-    stdout().execute(RestorePosition).unwrap();
-}
-fn main () -> std::io::Result<()>{
-    enable_raw_mode()?;
-    execute!(stdout(), Hide, Clear(All), MoveTo(0,5))?;
-    let board: [char;BOARD_SIZE.0 * BOARD_SIZE.1] = 
-                                ['#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#',
-                                 '#', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '#',
-                                 '#', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '#',
-                                 '#', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '#',
-                                 '#', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '#',
-                                 '#', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '#',
-                                 '#', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '#',
-                                 '#', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '#',
-                                 '#', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '#',
-                                 '#', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '#',
-                                 '#', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '#',
-                                 '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#', '#'];
-
-    let mut body: VecDeque<Coord> = VecDeque::new();
-    body.push_back(Coord { x: 1, y: 1 });
-    let mut snake: Snake = Snake::new(body, Coord::RIGHT, board);
-    spawn_fruit(&mut snake);
-    loop {
-        thread::sleep(time::Duration::from_millis(300));
-        match snake_loop(&mut snake) {
-            Ok(_) => continue,
-            Err(_) => {
-                break;
-            }
-        }
-    }
-    disable_raw_mode()?;
-    stdout().execute(Show)?;
-    Ok(())
-}
-
-fn snake_loop(snake: &mut Snake) -> Result<(), &str>{
-    change_dir(snake).unwrap();
-    match snake.travel() {
-        Ok(_) => print_board(&snake.board),
-        _ => {
-            stdout().execute(Clear(All)).unwrap();
-            println!("Game over!");
-            return Err("Game over");
-        }
-    }
-    Ok(())
-}
-
-fn change_dir(snake: &mut Snake)-> std::io::Result<()> {
+fn get_dir(cur_dir: Coord)-> Option<Coord>{
     let mut event: Option<Event> = None;
-    while poll(Duration::from_secs(0))? == true {
-        event = Some(read()?);
+    while poll(Duration::from_secs(0)).unwrap() == true {
+        event = Some(read().unwrap());
     }
     let mut dir: Coord = Coord::ZERO;
     match event {
@@ -162,30 +101,82 @@ fn change_dir(snake: &mut Snake)-> std::io::Result<()> {
         }
         _ => ()
     }
-    if dir + snake.dir == Coord::ZERO {
-        return Ok(())
+    if dir + cur_dir == Coord::ZERO {
+        return None
     }
-    if dir != Coord::ZERO {
-        snake.dir=dir
+    else if dir == Coord::ZERO {
+        return None
     }
-    Ok(())
+    return Some(dir)
 }
 
-fn spawn_fruit(snake: &mut Snake) {
+fn spawn_fruit(snake: &Snake, board: &mut [char]) {
     let mut rng = rand::rng();
-    let mut pos: usize;
+    let mut pos: Coord = Coord::ZERO;
     'gen_pos: loop {
-        pos = rng.random_range(13..131);
-        if pos % 12 == 0 || pos % 12 == 11{
-            continue
-        }
+        pos.x = rng.random_range(1..BOARD_SIZE.0);
+        pos.y = rng.random_range(1..BOARD_SIZE.1-1);
         for i in 0..snake.body.len() {
-            if snake.body[i].index() == pos {
+            if snake.body[i].index() == pos.index() {
                 continue 'gen_pos;
             }
         }
         break
 
     }
-    snake.board[pos] = 'X';
+    board[pos.index()] = 'X';
+}
+
+fn generate_board() -> [char;BOARD_LEN] {
+    let mut board: [char;BOARD_LEN] = [' ';BOARD_LEN];
+    for i in 1..BOARD_LEN-1 {
+        if i < BOARD_WIDTH -1 || i > BOARD_LEN-1-BOARD_WIDTH {
+            board[i] = '─'
+        }
+        else if i % BOARD_WIDTH == BOARD_WIDTH -1 || i % BOARD_WIDTH == 0 {
+            board[i] = '│'
+        }
+    }
+    board[0] = '┌';
+    board[BOARD_WIDTH-1] = '┐';
+    board[BOARD_LEN-BOARD_WIDTH] = '└';
+    board[BOARD_LEN-1] = '┘';
+
+    board
+}
+
+fn print_board(board: &[char]){
+    for col in 0..BOARD_SIZE.1{
+        for row in 0..BOARD_SIZE.0 * WIDTH_SCALE{
+            write!(stdout(), "{}",board[(col * BOARD_SIZE.0 * WIDTH_SCALE + row) as usize]).unwrap();
+        }
+        write!(stdout(), "\r\n").unwrap();
+    }
+    execute!(stdout(), cursor::RestorePosition).unwrap();
+}
+fn main (){
+    terminal::enable_raw_mode().unwrap();
+    execute!(stdout(), cursor::Hide, terminal::Clear(ClearType::All), cursor::MoveTo(0,5), cursor::SavePosition).unwrap();
+    let mut board = generate_board();
+    let mut snake: Snake = Snake::new(Coord {x: 1, y: 1}, Coord::RIGHT);
+    spawn_fruit(&snake, &mut board);
+    loop {
+        let mut dir: Coord = snake.dir.clone();
+        for _ in 0..50 {
+            if let Some(new_dir) = get_dir(snake.dir) {
+                dir = new_dir;
+            }
+            thread::sleep(Duration::from_millis(5));
+        }
+        snake.dir=dir;
+        match snake.travel(&mut board) {
+            Ok(_) => print_board(&board),
+            Err(_) => {
+                break;
+            }
+        }
+    }
+    execute!(stdout(), cursor::MoveDown((BOARD_SIZE.1) as u16), cursor::Show).unwrap();
+    terminal::disable_raw_mode().unwrap();
+    println!("Game over!\r\nScore: {}", snake.body.len()-1);
 }
