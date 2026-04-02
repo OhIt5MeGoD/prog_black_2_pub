@@ -7,6 +7,7 @@ use std::time::Duration;
 use crossterm::cursor;
 use crossterm::terminal::{self, ClearType};
 use crossterm::event::{poll, read, Event, KeyCode};
+use crossterm::style::{SetForegroundColor, Color};
 use crossterm::execute;
 use rand::RngExt;
 
@@ -67,16 +68,16 @@ impl Snake {
         let new_head = head.clone()+self.dir;
         self.body.push_back(new_head);
 
-        if matches!(board[new_head.index()], '#' | '─' | '│' | '┌' | '┐' | '└' | '┘' ) {
-            return Err(());
-        }
-        else if board[new_head.index()] == 'X' {
+        if board[new_head.index()] == 'X' {
             spawn_fruit(self, board);
         }
         else {
             let tail = self.body.front().expect("no body");
             board[tail.index()] = ' ';
             self.body.pop_front();
+        }
+        if matches!(board[new_head.index()], '#' | '─' | '│' | '┌' | '┐' | '└' | '┘' ) {
+            return Err(());
         }
         board[new_head.index()] = '@';
         Ok(())
@@ -146,9 +147,10 @@ fn generate_board() -> [char;BOARD_LEN] {
 }
 
 fn print_board(board: &[char]){
-    for col in 0..BOARD_SIZE.1{
-        for row in 0..BOARD_SIZE.0 * WIDTH_SCALE{
-            write!(stdout(), "{}",board[(col * BOARD_SIZE.0 * WIDTH_SCALE + row) as usize]).unwrap();
+    execute!(stdout(), SetForegroundColor(Color::Green)).unwrap();
+    for col in 0..(BOARD_SIZE.1) as usize{
+        for row in 0..BOARD_WIDTH{
+            write!(stdout(), "{}",board[col * BOARD_WIDTH + row]).unwrap();
         }
         write!(stdout(), "\r\n").unwrap();
     }
