@@ -1,12 +1,25 @@
 use std::io;
 use std::io::{stdout, Stdout, Write};
-use crossterm::{style::{Color, Stylize}, cursor::MoveTo, execute, terminal::{Clear, ClearType}};
+use crossterm::{style::{Color, Stylize}};
+use rand::RngExt;
 
 fn main() {
     play_connect4();
 }
 
 fn play_connect4() {
+    let mut game_mode: usize = 0;
+    while game_mode != 1 && game_mode != 2 {
+        _ = print_game_mode_selection();
+        game_mode = get_game_mode();
+    }
+    let mut bot: usize = 0;
+    if game_mode == 1 {
+        while bot != 1 && bot != 2 {
+            _ = print_order_selection();
+            bot = get_order();
+        }
+    }
     let mut grid: Vec<Vec<Cell>> = create_grid();
     let mut player: usize = 1;
     let mut column: usize = 0;
@@ -20,7 +33,12 @@ fn play_connect4() {
         input_error = false;
         range_error = false;
         full_col_error = false;
-        column = get_column();
+        if player != bot {
+            column = get_column();
+        }
+        else {
+            column = get_bot_column();
+        }
         if column != 8 && column != 9 {
             let row = make_move(&mut grid, player, column-1);
             if row == 7 {
@@ -71,7 +89,6 @@ fn create_grid() -> Vec<Vec<Cell>> {
 
 fn print_grid(grid: &Vec<Vec<Cell>>, player: usize, game_over: bool, input_error: bool, range_error: bool, full_col_error: bool, column: usize) -> std::io::Result<()> {
     let mut out = stdout();
-    execute!(out, MoveTo(0,0), Clear(ClearType::All), MoveTo(0,0))?;
     writeln!(out)?;
     writeln!(out)?;
     if input_error {
@@ -172,4 +189,71 @@ fn run_length(grid: &Vec<Vec<Cell>>, row: usize, column: usize, vert: isize, hor
         }
     }
     return count;
+}
+
+fn print_game_mode_selection() -> std::io::Result<()> {
+    let mut out = stdout();
+    writeln!(out)?;
+    writeln!(out, "Select Game Mode")?;
+    writeln!(out, "Enter '1' for 1 player")?;
+    writeln!(out, "Enter '2' for 2 player")?;
+    out.flush()?;
+    Ok(())
+}
+
+fn get_game_mode() -> usize {
+    let mut mode_str = String::new();
+    io::stdin().read_line(&mut mode_str).expect("Failed to read line");
+    println!("");
+    let mode: usize = match mode_str.trim().parse() {
+        Ok(n) => n,
+        Err(_) => {
+            return 3;
+        }
+    };
+    if mode > 2 || mode < 1 {
+        return 3;
+    }
+    return mode;
+}
+
+fn print_order_selection() -> std::io::Result<()> {
+    let mut out = stdout();
+    writeln!(out)?;
+    writeln!(out, "Select Order Mode")?;
+    writeln!(out, "Enter '1' to go first")?;
+    writeln!(out, "Enter '2' to go second")?;
+    writeln!(out, "Enter '3' for random")?;
+    out.flush()?;
+    Ok(())
+}
+
+fn get_order() -> usize {
+    let mut order_str = String::new();
+    io::stdin().read_line(&mut order_str).expect("Failed to read line");
+    println!("");
+    let order: usize = match order_str.trim().parse() {
+        Ok(n) => n,
+        Err(_) => {
+            return 3;
+        }
+    };
+    if order == 1 {
+        return 2;
+    }
+    if order == 2 {
+        return 1;
+    }
+    if order == 3 {
+        let mut rng = rand::rng();
+        return rng.random_range(1..3);
+    }
+    else {
+        return 3;
+    }
+}
+
+fn get_bot_column() -> usize {
+    let mut rng = rand::rng();
+        return rng.random_range(1..8);
 }
