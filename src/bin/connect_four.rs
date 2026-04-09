@@ -2,6 +2,8 @@ use std::io;
 use std::io::{stdout, Stdout, Write};
 use crossterm::{style::{Color, Stylize}};
 use rand::RngExt;
+use std::thread;
+use std::time::Duration;
 
 fn main() {
     play_connect4();
@@ -245,8 +247,7 @@ fn get_order() -> usize {
         return 1;
     }
     if order == 3 {
-        let mut rng = rand::rng();
-        return rng.random_range(1..3);
+        return rand::rng().random_range(1..3);
     }
     else {
         return 3;
@@ -254,6 +255,6 @@ fn get_order() -> usize {
 }
 
 fn get_bot_column() -> usize {
-    let mut rng = rand::rng();
-        return rng.random_range(1..8);
+    thread::sleep(Duration::from_secs(2));
+    return rand::rng().random_range(1..8);
 }
