@@ -26,10 +26,12 @@ fn play_connect4() {
     let mut player: usize = 1;
     let mut column: usize = 0;
     let mut game_over: bool = false;
+    let mut game_won: bool = false;
     let mut input_error: bool = false;
     let mut range_error: bool = false;
     let mut full_col_error: bool = false;
-    let _ = print_grid(&grid, player, game_over, input_error, range_error, full_col_error, column);
+
+    let _ = print_grid(&grid, player, bot, game_over, game_won, input_error, range_error, full_col_error, column);
 
     while !game_over {
         input_error = false;
@@ -39,7 +41,7 @@ fn play_connect4() {
             column = get_column();
         }
         else {
-            column = get_bot_column();
+            column = get_bot_column(&mut grid, bot);
         }
         if column != 8 && column != 9 {
             let row = make_move(&mut grid, player, column-1);
@@ -47,9 +49,15 @@ fn play_connect4() {
                 full_col_error = true;
             }
             else {
-                game_over = check_win(&grid, row, column-1);
+                game_over = check_full(&grid);
                 if !game_over {
-                    player = (player%2)+1;
+                    game_won = check_win(&grid, row, column-1);
+                    if !game_won {
+                        player = (player%2)+1;
+                    }
+                    else {
+                        game_over = true;
+                    } 
                 }
             }
         }
@@ -59,7 +67,7 @@ fn play_connect4() {
         if column == 9 {
             input_error = true;
         }
-        let _ = print_grid(&grid, player, game_over, input_error, range_error, full_col_error, column);
+        let _ = print_grid(&grid, player, bot, game_over, game_won, input_error, range_error, full_col_error, column);
     }
 }
 
@@ -89,7 +97,7 @@ fn create_grid() -> Vec<Vec<Cell>> {
     return grid;
 }
 
-fn print_grid(grid: &Vec<Vec<Cell>>, player: usize, game_over: bool, input_error: bool, range_error: bool, full_col_error: bool, column: usize) -> std::io::Result<()> {
+fn print_grid(grid: &Vec<Vec<Cell>>, player: usize, bot: usize, game_over: bool, game_won: bool, input_error: bool, range_error: bool, full_col_error: bool, column: usize) -> std::io::Result<()> {
     let mut out = stdout();
     writeln!(out)?;
     writeln!(out)?;
@@ -122,10 +130,20 @@ fn print_grid(grid: &Vec<Vec<Cell>>, player: usize, game_over: bool, input_error
     }
     if !game_over {
         writeln!(out, "Player {}'s Turn:", player)?;
-        writeln!(out, "Enter Column: ")?;
+        if player != bot {
+            writeln!(out, "Enter Column: ")?;
+        }
+        else {
+            writeln!(out, "BOT IS MAKING ITS MOVE")?;
+        }
     }
     else {
-        writeln!(out, "PLAYER {} WINS!", player)?;
+        if game_won {
+            writeln!(out, "PLAYER {} WINS!", player)?;
+        }
+        else {
+            writeln!(out, "Game Drawn")?;
+        }
     }
     out.flush()?;
     Ok(())
@@ -163,6 +181,10 @@ fn make_move(grid: &mut Vec<Vec<Cell>>, player: usize, column: usize) -> usize {
     return row;
 }
 
+fn undo_move(grid: &mut Vec<Vec<Cell>>, row: usize, column: usize) {
+    grid[row][column] = Cell::Empty;
+}
+
 fn check_win(grid: &Vec<Vec<Cell>>, row: usize, column: usize) -> bool {
     let directions: [(isize, isize); 4] = [(0,1), (1,0), (1,1), (-1, 1)];
     for (vert, horiz) in directions {
@@ -174,6 +196,15 @@ fn check_win(grid: &Vec<Vec<Cell>>, row: usize, column: usize) -> bool {
         }
     }
     return false;
+}
+
+fn check_full(grid: &Vec<Vec<Cell>>) -> bool {
+    for i in 0..grid[0].len() {
+        if grid[grid.len()-1][i] == Cell::Empty {
+            return false;
+        }
+    }
+    return true;
 }
 
 fn run_length(grid: &Vec<Vec<Cell>>, row: usize, column: usize, vert: isize, horiz: isize) -> isize {
@@ -254,7 +285,104 @@ fn get_order() -> usize {
     }
 }
 
-fn get_bot_column() -> usize {
+fn get_bot_column(grid: &mut Vec<Vec<Cell>>, bot: usize) -> usize {
     thread::sleep(Duration::from_secs(2));
-    return rand::rng().random_range(1..8);
+    let player = (bot%2)+1;
+    
+    // win condition
+    for i in 0..grid[0].len() {
+       let row = make_move(grid, bot, i);
+            if row != 7 {
+                let game_over = check_win(grid, row, i);
+                undo_move(grid, row, i);
+                if game_over {
+                    println!("I Win!");
+                    return i+1;
+                }
+            } 
+    }
+    
+
+    // blocking player win
+    let mut block_attempts = [false, false, false, false, false, false, false];
+    while block_attempts.contains(&false) {
+        
+        let column = rand::rng().random_range(0..7);
+        if block_attempts[column] == false {
+
+            let row = make_move(grid, player, column);
+            if row != 7 {
+                let game_over = check_win(grid, row, column);
+                undo_move(grid, row, column);
+                if game_over {
+                    println!("Block");
+                    return column+1;
+                }
+                else {
+                    block_attempts[column] = true;
+                }
+            }
+            else {
+                block_attempts[column] = true;
+            }
+        }
+    }
+
+    // random BUT not setting up player win condition
+    let mut bad_moves = [false, false, false, false, false, false, false];
+    while bad_moves.contains(&false) {
+
+        let bot_column = rand::rng().random_range(0..7);
+        let mut bad_move: bool = false;
+        if bad_moves[bot_column] == false {
+
+            let bot_row = make_move(grid, bot, bot_column);
+            if bot_row != 7 {
+                for i in 0..grid[0].len() {
+                    let player_row = make_move(grid, player, i);
+
+                    if player_row != 7 {
+                        let game_over = check_win(grid, player_row, i);
+                        undo_move(grid, player_row, i);
+                        if game_over {
+                            bad_move = true;
+                            bad_moves[bot_column] = true;
+                        }
+                    }
+
+                }
+                
+                undo_move(grid, bot_row, bot_column);
+                if bad_move == false {
+                    println!("Random Selection");
+                    return bot_column+1;
+                }
+            } 
+            else {
+                bad_moves[bot_column] = true;
+            }
+        }  
+    }
+
+    // gives up, places in random non-full column
+    let mut full_moves = [false, false, false, false, false, false, false];
+    while full_moves.contains(&false) {
+
+        let bot_column = rand::rng().random_range(0..7);
+        if full_moves[bot_column] == false {
+
+            let bot_row = make_move(grid, bot, bot_column);
+            if bot_row != 7 {
+                undo_move(grid, bot_row, bot_column);
+                println!("I have a bad feeling...");
+                return bot_column+1;
+            } 
+            else {
+                full_moves[bot_column] = true;
+            }
+        }  
+    }
+
+    // board full (should never reach here)
+    return 0;
 }
