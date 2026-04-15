@@ -1,24 +1,21 @@
 use std::io;
-use std::io::{stdout, Stdout, Write};
 use crossterm::{style::{Color, Stylize}};
 use rand::RngExt;
 use std::thread;
 use std::time::Duration;
 
-fn main() {
-    play_connect4();
-}
+// fn main() {
+//     play_connect4();
+// }
 
-fn play_connect4() {
+pub fn play_connect4() {
     let mut game_mode: usize = 0;
     while game_mode != 1 && game_mode != 2 {
-        _ = print_game_mode_selection();
         game_mode = get_game_mode();
     }
     let mut bot: usize = 0;
     if game_mode == 1 {
         while bot != 1 && bot != 2 {
-            _ = print_order_selection();
             bot = get_order();
         }
     }
@@ -80,13 +77,12 @@ enum Cell {
     Yellow,
 }
 
-fn print_cell_string(c: &Cell, out: &mut Stdout) -> std::io::Result<()> {
+fn print_cell_string(c: &Cell) {
     match c {
-        Cell::Empty => write!(out, "   ")?,
-        Cell::Red => write!(out, "{}", " ● ".with(Color::Red))?,
-        Cell::Yellow => write!(out, "{}", " ● ".with(Color::Yellow))?,
+        Cell::Empty => print!("   "),
+        Cell::Red => print!("{}", " ● ".with(Color::Red)),
+        Cell::Yellow => print!("{}", " ● ".with(Color::Yellow)),
     }
-    Ok(())
 }
 
 fn create_grid() -> Vec<Vec<Cell>> {
@@ -97,56 +93,55 @@ fn create_grid() -> Vec<Vec<Cell>> {
     return grid;
 }
 
-fn print_grid(grid: &Vec<Vec<Cell>>, player: usize, bot: usize, game_over: bool, game_won: bool, input_error: bool, range_error: bool, full_col_error: bool, column: usize) -> std::io::Result<()> {
-    let mut out = stdout();
-    writeln!(out)?;
-    writeln!(out)?;
+fn print_grid(grid: &Vec<Vec<Cell>>, player: usize, bot: usize, game_over: bool, game_won: bool, input_error: bool, range_error: bool, full_col_error: bool, column: usize) {
+    println!();
+    println!();
     if input_error {
-        writeln!(out, "Invalid number entered")?;
+        println!("Invalid number entered");
     }
     else {
         if range_error {
-            writeln!(out, "Entered value not in range 1-7")?;
+            println!("Entered value not in range 1-7");
         }
         else {
             if full_col_error {
-                writeln!(out, "Column {} is full!", column)?;
+                println!("Column {} is full!", column);
             }
             else {
-                writeln!(out)?;
+                println!();
             }
         }
     }
-    writeln!(out, "  1   2   3   4   5   6   7")?;
-    writeln!(out, "-----------------------------")?;
+    println!("  1   2   3   4   5   6   7");
+    println!("-----------------------------");
     for i in (0..grid.len()).rev() {
-        write!(out, "|")?;
+        print!("|");
         for j in 0..grid[i].len() {
-            let _ = print_cell_string(&grid[i][j], &mut out);
-            write!(out, "|")?;
+            let _ = print_cell_string(&grid[i][j]);
+            print!("|");
         }
-        writeln!(out)?;
-        writeln!(out, "-----------------------------")?;
+        println!();
+        println!("-----------------------------");
     }
     if !game_over {
-        writeln!(out, "Player {}'s Turn:", player)?;
+        println!("Player {}'s Turn:", player);
         if player != bot {
-            writeln!(out, "Enter Column: ")?;
+            println!("Enter Column: ");
         }
         else {
-            writeln!(out, "BOT IS MAKING ITS MOVE")?;
+            println!("BOT IS MAKING ITS MOVE");
         }
     }
     else {
         if game_won {
-            writeln!(out, "PLAYER {} WINS!", player)?;
+            println!("PLAYER {} WINS!", player);
+            println!();
         }
         else {
-            writeln!(out, "Game Drawn")?;
+            println!("Game Drawn");
+            println!();
         }
     }
-    out.flush()?;
-    Ok(())
 }
 
 fn get_column() -> usize {
@@ -224,17 +219,12 @@ fn run_length(grid: &Vec<Vec<Cell>>, row: usize, column: usize, vert: isize, hor
     return count;
 }
 
-fn print_game_mode_selection() -> std::io::Result<()> {
-    let mut out = stdout();
-    writeln!(out)?;
-    writeln!(out, "Select Game Mode")?;
-    writeln!(out, "Enter '1' for 1 player")?;
-    writeln!(out, "Enter '2' for 2 player")?;
-    out.flush()?;
-    Ok(())
-}
-
 fn get_game_mode() -> usize {
+    println!();
+    println!("Select Game Mode");
+    println!("Enter '1' for 1 player");
+    println!("Enter '2' for 2 player");
+
     let mut mode_str = String::new();
     io::stdin().read_line(&mut mode_str).expect("Failed to read line");
     println!("");
@@ -250,18 +240,13 @@ fn get_game_mode() -> usize {
     return mode;
 }
 
-fn print_order_selection() -> std::io::Result<()> {
-    let mut out = stdout();
-    writeln!(out)?;
-    writeln!(out, "Select Order Mode")?;
-    writeln!(out, "Enter '1' to go first")?;
-    writeln!(out, "Enter '2' to go second")?;
-    writeln!(out, "Enter '3' for random")?;
-    out.flush()?;
-    Ok(())
-}
-
 fn get_order() -> usize {
+    println!();
+    println!("Select Order Mode");
+    println!("Enter '1' to go first");
+    println!("Enter '2' to go second");
+    println!("Enter '3' for random");
+
     let mut order_str = String::new();
     io::stdin().read_line(&mut order_str).expect("Failed to read line");
     println!("");
