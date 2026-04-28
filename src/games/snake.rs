@@ -156,7 +156,7 @@ fn print_board(board: &[char]){
     }
     execute!(stdout(), cursor::RestorePosition).unwrap();
 }
-fn main (){
+pub fn main (){
     terminal::enable_raw_mode().unwrap();
     execute!(stdout(), cursor::Hide, terminal::Clear(ClearType::All), cursor::MoveTo(0,5), cursor::SavePosition).unwrap();
     let mut board = generate_board();

@@ -1,5 +1,5 @@
 // Authors: Neshesh Rai, Oliver Veal, Jed Nicholson
-use rust_games::games::{connect_four};
+use rust_games::games::{connect_four, snake};
 use std::io;
 
 fn main() {
@@ -20,6 +20,8 @@ fn main() {
         if choice == 2 {
             println!("Selected Snake");
             println!();
+            snake::main();
+
         }
         if choice == 3 {
             println!("Selected Blackjack");
